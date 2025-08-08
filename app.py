@@ -1,6 +1,5 @@
 from flask import Flask, request, Response
 import os
-import json
 import firebase_admin
 from firebase_admin import credentials, firestore
 from twilio.twiml.voice_response import VoiceResponse, Gather
@@ -9,22 +8,27 @@ app = Flask(__name__)
 
 # --- Firebase setup ---
 try:
-    firebase_json = os.environ.get("firebase-key.json")  # Get from Render env vars
-    if firebase_json:
-        cred_dict = json.loads(firebase_json)  # Convert JSON string to dict
-        cred = credentials.Certificate(cred_dict)
+    secret_file_path = "/etc/secrets/firebase-key.json"  # Path for Render Secret Files
+    local_file_path = "firebase-key.json"  # Local file for development
+
+    if os.path.exists(secret_file_path):
+        cred = credentials.Certificate(secret_file_path)
         firebase_admin.initialize_app(cred)
-        db = firestore.client()
-        print("✅ Firebase initialized successfully.")
+        print(f"✅ Firebase initialized from secret file: {secret_file_path}")
+    elif os.path.exists(local_file_path):
+        cred = credentials.Certificate(local_file_path)
+        firebase_admin.initialize_app(cred)
+        print(f"✅ Firebase initialized from local file: {local_file_path}")
     else:
-        db = None
-        print("❌ Environment variable 'firebase-key.json' is not set.")
+        raise FileNotFoundError("No Firebase key file found.")
+
+    db = firestore.client()
+
 except Exception as e:
     db = None
     print(f"❌ Firebase initialization failed: {e}")
 
 # --- ROUTES ---
-
 @app.route("/")
 def hello():
     return "The DIGI9 IVR Brain is running!"
@@ -37,7 +41,7 @@ def get_ticket_status(ticket_id):
         ticket_ref = db.collection('tickets').document(ticket_id)
         ticket = ticket_ref.get()
         if ticket.exists:
-            status = ticket.to_dict()['status']
+            status = ticket.to_dict().get('status', 'Unknown')
             return f"Status for ticket {ticket_id}: {status}"
         else:
             return f"Ticket {ticket_id} not found."
@@ -144,7 +148,7 @@ def handle_ticket_id():
         ticket = ticket_ref.get()
 
         if ticket.exists:
-            status = ticket.to_dict()['status']
+            status = ticket.to_dict().get('status', 'Unknown')
             tts_text = f"The status for your ticket number {ticket_id} is: {status}"
             response.say(tts_text, voice="Polly.Amy", language="en-GB")
         else:
