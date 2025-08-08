@@ -58,11 +58,8 @@ def get_ticket_status(ticket_id):
 def twilio_call_handler():
     try:
         response = VoiceResponse()
-
-        # Step 1: Welcome message
         response.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/01_welcome_v2.wav")
 
-        # Step 2: Main menu
         gather = Gather(
             num_digits=1,
             action=f"{BASE_URL}/handle_main_menu",
@@ -71,8 +68,9 @@ def twilio_call_handler():
         gather.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/02_main_menu_v3.wav")
         response.append(gather)
 
-        # If no input, repeat menu
-        response.redirect(f"{BASE_URL}/twilio_call_handler")
+        # Only repeat if no input
+        response.say("We did not receive any input. Goodbye.")
+        response.hangup()
 
         return Response(str(response), mimetype="text/xml")
     except Exception as e:
@@ -94,7 +92,6 @@ def handle_main_menu():
             response.hangup()
 
         elif digit == "2":
-            # Technical Support submenu
             gather = Gather(
                 num_digits=1,
                 action=f"{BASE_URL}/handle_support_menu",
@@ -102,9 +99,8 @@ def handle_main_menu():
             )
             gather.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/05_support_menu.wav")
             response.append(gather)
-
-            # If no input, return here instead of going to welcome
-            response.redirect(f"{BASE_URL}/handle_main_menu")
+            response.say("We did not receive any input. Goodbye.")
+            response.hangup()
 
         elif digit == "3":
             response.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/06_hr_transfer.wav")
@@ -121,7 +117,6 @@ def handle_main_menu():
             response.redirect(f"{BASE_URL}/twilio_call_handler")
 
         return Response(str(response), mimetype="text/xml")
-
     except Exception as e:
         print(f"🔥 Error in /handle_main_menu: {e}")
         fallback = VoiceResponse()
@@ -151,16 +146,14 @@ def handle_support_menu():
             )
             gather.say("Please enter or say your 6-digit ticket ID after the beep.", voice="Polly.Amy", language="en-GB")
             response.append(gather)
-
-            # If no input here, return to support menu instead of main menu
-            response.redirect(f"{BASE_URL}/handle_support_menu")
+            response.say("We didn't receive your input. Goodbye!", voice="Polly.Amy", language="en-GB")
+            response.hangup()
 
         else:
             response.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/03_invalid_input.wav")
-            response.redirect(f"{BASE_URL}/handle_support_menu")
+            response.redirect(f"{BASE_URL}/twilio_call_handler")
 
         return Response(str(response), mimetype="text/xml")
-
     except Exception as e:
         print(f"🔥 Error in /handle_support_menu: {e}")
         fallback = VoiceResponse()
@@ -177,7 +170,7 @@ def handle_ticket_id():
 
         if not ticket_id:
             response.say("No input detected. Returning to the main menu.", voice="Polly.Amy", language="en-GB")
-            response.redirect(f"{BASE_URL}/handle_support_menu")
+            response.redirect(f"{BASE_URL}/twilio_call_handler")
             return Response(str(response), mimetype="text/xml")
 
         ticket_ref = db.collection('tickets').document(ticket_id)
@@ -194,7 +187,6 @@ def handle_ticket_id():
         response.hangup()
 
         return Response(str(response), mimetype="text/xml")
-
     except Exception as e:
         print(f"🔥 Error in /handle_ticket_id: {e}")
         fallback = VoiceResponse()
