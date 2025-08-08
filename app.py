@@ -26,15 +26,16 @@ try:
         raise FileNotFoundError("No Firebase key file found.")
 
     db = firestore.client()
-
 except Exception as e:
     db = None
     print(f"❌ Firebase initialization failed: {e}")
+
 
 # --- ROUTES ---
 @app.route("/")
 def hello():
     return "The DIGI9 IVR Brain is running!"
+
 
 @app.route("/ticket_status/<ticket_id>")
 def get_ticket_status(ticket_id):
@@ -51,6 +52,7 @@ def get_ticket_status(ticket_id):
     except Exception as e:
         print(f"🔥 Error in ticket_status: {e}")
         return "Sorry, an error occurred while fetching the ticket status."
+
 
 @app.route("/twilio_call_handler", methods=["POST"])
 def twilio_call_handler():
@@ -79,6 +81,7 @@ def twilio_call_handler():
         fallback.say("Sorry, an error occurred.")
         return Response(str(fallback), mimetype="text/xml")
 
+
 @app.route("/handle_main_menu", methods=["POST"])
 def handle_main_menu():
     try:
@@ -89,7 +92,9 @@ def handle_main_menu():
             response.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/04_sales_transfer.wav")
             response.say("Transferring to sales. Goodbye.")
             response.hangup()
+
         elif digit == "2":
+            # Technical Support submenu
             gather = Gather(
                 num_digits=1,
                 action=f"{BASE_URL}/handle_support_menu",
@@ -97,26 +102,33 @@ def handle_main_menu():
             )
             gather.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/05_support_menu.wav")
             response.append(gather)
-            response.redirect(f"{BASE_URL}/twilio_call_handler")
+
+            # If no input, return here instead of going to welcome
+            response.redirect(f"{BASE_URL}/handle_main_menu")
+
         elif digit == "3":
             response.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/06_hr_transfer.wav")
             response.say("Transferring to HR. Goodbye.")
             response.hangup()
+
         elif digit == "4":
             response.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/07_office_info.wav")
             response.say("Thank you for calling. Goodbye.")
             response.hangup()
+
         else:
             response.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/03_invalid_input.wav")
             response.redirect(f"{BASE_URL}/twilio_call_handler")
 
         return Response(str(response), mimetype="text/xml")
+
     except Exception as e:
         print(f"🔥 Error in /handle_main_menu: {e}")
         fallback = VoiceResponse()
         fallback.say("An error occurred in the main menu. Goodbye.")
         fallback.hangup()
         return Response(str(fallback), mimetype="text/xml")
+
 
 @app.route("/handle_support_menu", methods=["POST"])
 def handle_support_menu():
@@ -128,6 +140,7 @@ def handle_support_menu():
             response.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/08_log_new_ticket.wav")
             response.say("A new support ticket has been logged. Goodbye.")
             response.hangup()
+
         elif digit == "2":
             gather = Gather(
                 input="speech dtmf",
@@ -138,19 +151,23 @@ def handle_support_menu():
             )
             gather.say("Please enter or say your 6-digit ticket ID after the beep.", voice="Polly.Amy", language="en-GB")
             response.append(gather)
-            response.say("We didn't receive your input. Goodbye!", voice="Polly.Amy", language="en-GB")
-            response.hangup()
+
+            # If no input here, return to support menu instead of main menu
+            response.redirect(f"{BASE_URL}/handle_support_menu")
+
         else:
             response.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/03_invalid_input.wav")
-            response.redirect(f"{BASE_URL}/twilio_call_handler")
+            response.redirect(f"{BASE_URL}/handle_support_menu")
 
         return Response(str(response), mimetype="text/xml")
+
     except Exception as e:
         print(f"🔥 Error in /handle_support_menu: {e}")
         fallback = VoiceResponse()
         fallback.say("An error occurred in the support menu. Goodbye.")
         fallback.hangup()
         return Response(str(fallback), mimetype="text/xml")
+
 
 @app.route("/handle_ticket_id", methods=["POST"])
 def handle_ticket_id():
@@ -160,7 +177,7 @@ def handle_ticket_id():
 
         if not ticket_id:
             response.say("No input detected. Returning to the main menu.", voice="Polly.Amy", language="en-GB")
-            response.redirect(f"{BASE_URL}/twilio_call_handler")
+            response.redirect(f"{BASE_URL}/handle_support_menu")
             return Response(str(response), mimetype="text/xml")
 
         ticket_ref = db.collection('tickets').document(ticket_id)
@@ -177,12 +194,14 @@ def handle_ticket_id():
         response.hangup()
 
         return Response(str(response), mimetype="text/xml")
+
     except Exception as e:
         print(f"🔥 Error in /handle_ticket_id: {e}")
         fallback = VoiceResponse()
         fallback.say("Sorry, an error occurred while checking your ticket.")
         fallback.hangup()
         return Response(str(fallback), mimetype="text/xml")
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
