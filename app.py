@@ -11,21 +11,23 @@ BASE_URL = "https://digi9-ivr.onrender.com"
 
 # --- Firebase setup ---
 try:
-    secret_file_path = "/etc/secrets/firebase-key.json"  # Path for Render Secret Files
-    local_file_path = "firebase-key.json"  # Local file for development
+    secret_file_path = "/etc/secrets/firebase-key.json"  # Render Secret Files path
+    local_file_path = "firebase-key.json"  # Local development path
 
-    if os.path.exists(secret_file_path):
-        cred = credentials.Certificate(secret_file_path)
-        firebase_admin.initialize_app(cred)
-        print(f"✅ Firebase initialized from secret file: {secret_file_path}")
-    elif os.path.exists(local_file_path):
-        cred = credentials.Certificate(local_file_path)
-        firebase_admin.initialize_app(cred)
-        print(f"✅ Firebase initialized from local file: {local_file_path}")
-    else:
-        raise FileNotFoundError("No Firebase key file found.")
+    if not firebase_admin._apps:  # Prevent re-initialization error
+        if os.path.exists(secret_file_path):
+            cred = credentials.Certificate(secret_file_path)
+            firebase_admin.initialize_app(cred)
+            print(f"✅ Firebase initialized from secret file: {secret_file_path}")
+        elif os.path.exists(local_file_path):
+            cred = credentials.Certificate(local_file_path)
+            firebase_admin.initialize_app(cred)
+            print(f"✅ Firebase initialized from local file: {local_file_path}")
+        else:
+            raise FileNotFoundError("No Firebase key file found.")
 
     db = firestore.client()
+
 except Exception as e:
     db = None
     print(f"❌ Firebase initialization failed: {e}")
@@ -58,8 +60,11 @@ def get_ticket_status(ticket_id):
 def twilio_call_handler():
     try:
         response = VoiceResponse()
+
+        # Welcome
         response.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/01_welcome_v2.wav")
 
+        # Main menu with gather
         gather = Gather(
             num_digits=1,
             action=f"{BASE_URL}/handle_main_menu",
@@ -68,11 +73,12 @@ def twilio_call_handler():
         gather.play("https://cdn.jsdelivr.net/gh/kirtivardhan80/digi9-audio-assets@main/02_main_menu_v3.wav")
         response.append(gather)
 
-        # Only repeat if no input
+        # If no input
         response.say("We did not receive any input. Goodbye.")
         response.hangup()
 
         return Response(str(response), mimetype="text/xml")
+
     except Exception as e:
         print(f"🔥 Error in /twilio_call_handler: {e}")
         fallback = VoiceResponse()
@@ -117,6 +123,7 @@ def handle_main_menu():
             response.redirect(f"{BASE_URL}/twilio_call_handler")
 
         return Response(str(response), mimetype="text/xml")
+
     except Exception as e:
         print(f"🔥 Error in /handle_main_menu: {e}")
         fallback = VoiceResponse()
@@ -154,6 +161,7 @@ def handle_support_menu():
             response.redirect(f"{BASE_URL}/twilio_call_handler")
 
         return Response(str(response), mimetype="text/xml")
+
     except Exception as e:
         print(f"🔥 Error in /handle_support_menu: {e}")
         fallback = VoiceResponse()
@@ -187,6 +195,7 @@ def handle_ticket_id():
         response.hangup()
 
         return Response(str(response), mimetype="text/xml")
+
     except Exception as e:
         print(f"🔥 Error in /handle_ticket_id: {e}")
         fallback = VoiceResponse()
