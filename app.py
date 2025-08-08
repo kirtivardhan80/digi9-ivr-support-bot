@@ -1,16 +1,24 @@
 from flask import Flask, request, Response
+import os
+import json
 import firebase_admin
 from firebase_admin import credentials, firestore
 from twilio.twiml.voice_response import VoiceResponse, Gather
 
 app = Flask(__name__)
 
-# Firebase setup
+# --- Firebase setup ---
 try:
-    cred = credentials.Certificate("firebase-key.json")
-    firebase_admin.initialize_app(cred)
-    db = firestore.client()
-    print("✅ Firebase initialized successfully.")
+    firebase_json = os.environ.get("firebase-key.json")  # Get from Render env vars
+    if firebase_json:
+        cred_dict = json.loads(firebase_json)  # Convert JSON string to dict
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred)
+        db = firestore.client()
+        print("✅ Firebase initialized successfully.")
+    else:
+        db = None
+        print("❌ Environment variable 'firebase-key.json' is not set.")
 except Exception as e:
     db = None
     print(f"❌ Firebase initialization failed: {e}")
@@ -154,4 +162,6 @@ def handle_ticket_id():
         return Response(str(fallback), mimetype="text/xml")
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # For Render, bind to host 0.0.0.0 and port from environment variable
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=False, host="0.0.0.0", port=port)
